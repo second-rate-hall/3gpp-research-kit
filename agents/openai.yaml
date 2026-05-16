@@ -1,0 +1,6 @@
+interface:
+  display_name: "3GPP Research Kit"
+  short_description: "Evidence-grounded 3GPP standards research workbench."
+  default_prompt: "Use $3gpp-research-kit to research this 3GPP standards question with official evidence and a reusable report."
+policy:
+  allow_implicit_invocation: true

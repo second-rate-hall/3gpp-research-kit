@@ -1,0 +1,25 @@
+# User-provided large 3GPP materials
+TDoc/_incoming/*
+TDoc/_processed/*
+
+# Keep folder placeholders
+!TDoc/_incoming/.gitkeep
+!TDoc/_processed/.gitkeep
+
+# Research outputs are local by default
+research-runs/*
+!research-runs/README.md
+!research-runs/_template/
+!research-runs/_template/**
+
+# Generated local indexes and databases
+TDoc/_index/metadata.csv
+TDoc/_index/*.db
+TDoc/_index/*.db-*
+tools.json
+
+# Local caches and temporary files
+.cache/
+tmp/
+*.log
+*.tmp

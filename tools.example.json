@@ -1,0 +1,27 @@
+{
+  "teddi": {
+    "type": "terminology",
+    "command": "teddi",
+    "notes": "Example: python scripts/3gpp_research.py run-tool teddi search-term QoS --pattern exactmatch"
+  },
+  "telco-rag": {
+    "type": "rag",
+    "command": "telco-rag",
+    "notes": "Replace with the local Telco-RAG CLI or wrapper command if installed."
+  },
+  "chat3gpp": {
+    "type": "rag",
+    "command": "chat3gpp",
+    "notes": "Replace with the local Chat3GPP CLI or wrapper command if installed."
+  },
+  "3gpp-mcp": {
+    "type": "mcp",
+    "command": "3gpp-mcp",
+    "notes": "Replace with your local MCP client wrapper. MCP hosts often need an Agent-side integration rather than a plain CLI."
+  },
+  "patent-mcp": {
+    "type": "mcp",
+    "command": "python mcp/patent-mcp-server.py",
+    "notes": "Local JSON-lines patent background tool. Use for auxiliary pain-point analysis only; do not treat patent background as 3GPP standard evidence."
+  }
+}

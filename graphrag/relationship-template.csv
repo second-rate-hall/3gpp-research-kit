@@ -1,0 +1,2 @@
+source_type,source_id,relation,target_type,target_id,evidence_source,evidence_text,confidence,verification_status,notes
+CR,CR-0000,modifies,Clause,TS xx.xxx clause x.y,TDoc or Portal URL,,medium,needs_verification,
