@@ -26,6 +26,13 @@ python scripts\docx_track_changes_parser.py TDoc\_incoming\R2-xxxxxxx.docx --out
 
 本目录包含本项目的本地自动化入口。现成工作环境型 Agent 可以调用这些脚本完成下载、解析、建库、检索和证据检查。
 
+`scripts/3gpp_research.py` 不应承载 3GPP 领域知识和报告结构。可配置内容放在：
+
+- `config/research-taxonomy.json`：任务分类、候选规范提示、检索扩展、排序和 claim 规则。
+- `templates/research-report.md`：一键研究报告模板。
+- `tools/registry.json`：MCP、RAG、GraphRAG、专利背景和本地 CLI 的工具角色。
+- `sources/search-recipes.json`：本地资料不足时的在线搜索 recipes。
+
 ## CLI
 
 ```bash
@@ -61,7 +68,7 @@ python scripts/3gpp_research.py run-tool teddi search-term QoS --pattern exactma
 
 | 文件 | 用途 |
 | --- | --- |
-| `3gpp_research.py` | 下载、解析、建库、检索和证据检查的本地 CLI |
+| `3gpp_research.py` | 下载、解析、建库、检索、证据检查和模板渲染的本地 CLI |
 | `convert-documents.md` | 描述 PDF / DOCX / ZIP 等资料转换为 Markdown、TXT、CSV、JSON 的目标接口 |
 | `build-index.md` | 描述从原始资料和转换结果生成 `TDoc/_index/` 元数据索引的目标接口 |
 
@@ -71,12 +78,13 @@ python scripts/3gpp_research.py run-tool teddi search-term QoS --pattern exactma
 
 ```text
 question
--> classify task
--> infer or accept candidate specs
+-> classify task by config/research-taxonomy.json
+-> infer or accept candidate specs by config/research-taxonomy.json
 -> fetch or reuse official materials
 -> parse
 -> build-db
--> retrieve evidence
+-> retrieve evidence by configured query expansion and ranking rules
+-> render templates/research-report.md
 -> write research-runs/<timestamp>-<topic>.md
 -> verify report
 ```

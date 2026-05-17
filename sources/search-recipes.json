@@ -1,0 +1,59 @@
+{
+  "spec_clause": {
+    "official_first": [
+      "https://www.3gpp.org/ftp/Specs/archive/{series}_series/{spec}/",
+      "https://portal.etsi.org/new3g/specs/specs.htm",
+      "https://www.3gpp.org/DynaReport/{compact_spec}.htm"
+    ],
+    "web_queries": [
+      "site:3gpp.org/ftp/Specs/archive {spec} {keywords}",
+      "site:3gpp.org/DynaReport {spec} {keywords}",
+      "site:portal.etsi.org {spec} {keywords}"
+    ]
+  },
+  "cr_trace": {
+    "official_first": [
+      "https://portal.3gpp.org/ChangeRequests.aspx",
+      "https://www.3gpp.org/ftp/"
+    ],
+    "web_queries": [
+      "site:portal.3gpp.org/ChangeRequests {spec} CR {keywords}",
+      "site:3gpp.org/ftp {spec} CR \"reason for change\" {keywords}",
+      "site:3gpp.org/ftp/tsg_ran {keywords} CR TDoc"
+    ]
+  },
+  "tdoc_meeting": {
+    "official_first": [
+      "https://portal.3gpp.org/TDocList.aspx",
+      "https://www.3gpp.org/ftp/"
+    ],
+    "web_queries": [
+      "site:3gpp.org/ftp/tsg_ran {keywords} \"Meeting Report\"",
+      "site:3gpp.org/ftp/tsg_sa {keywords} \"Meeting Report\"",
+      "site:3gpp.org/ftp/tsg_ct {keywords} \"Meeting Report\"",
+      "site:portal.3gpp.org {keywords} TDoc"
+    ]
+  },
+  "feature_evolution": {
+    "official_first": [
+      "https://www.3gpp.org/DynaReport",
+      "https://portal.3gpp.org/desktopmodules/WorkItem/WorkItemDetails.aspx"
+    ],
+    "web_queries": [
+      "site:3gpp.org/DynaReport {keywords} Work Item",
+      "site:3gpp.org/ftp {keywords} WID",
+      "site:3gpp.org/ftp {keywords} \"Work Item\" \"Meeting Report\""
+    ]
+  },
+  "patent_background": {
+    "official_first": [
+      "https://patents.google.com/",
+      "https://worldwide.espacenet.com/"
+    ],
+    "web_queries": [
+      "site:patents.google.com/patent 3GPP {keywords} background",
+      "site:patents.google.com/patent {keywords} \"Background\" \"3GPP\""
+    ],
+    "status": "auxiliary_background"
+  }
+}

@@ -2,6 +2,8 @@
 
 本文件规定现成工作环境型 Agent 在不同 3GPP 研究任务下应优先调用哪些项目资产和工具。
 
+工具能力的机器可读注册表见 `tools/registry.json`。本文件负责说明任务到工具的路由原则，`workflows/tool-orchestration.md` 负责说明完整编排链路。
+
 | 任务 | 优先工具 / 目录 | 输出 |
 | --- | --- | --- |
 | 判断问题涉及哪些规范 | `mcp/3gpp-mcp-server.md`、`sources/3gpp-portal.md` | 候选 TS/TR、工作组、Release 范围 |
@@ -12,6 +14,7 @@
 | 分析公司立场 | `graphrag/`、TDoc 元数据、Meeting Report | 公司、提案、结论、立场变化 |
 | 批量整理会议材料 | `scripts/`、`TDoc/_incoming/`、`TDoc/_processed/` | Markdown、CSV、SQLite 或索引文件 |
 | 生成最终报告 | `workflows/report-template.md`、`workflows/checklist.md` | 带证据链的研究报告 |
+| 本地资料不足 | `sources/online-search-playbook.md`、`sources/search-recipes.json` | 官方候选来源、下载清单、待核验项 |
 
 ## 调用顺序
 

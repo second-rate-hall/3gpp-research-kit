@@ -41,6 +41,9 @@ TDOC_INDEX = ROOT / "TDoc" / "_index"
 DEFAULT_DB = TDOC_INDEX / "research.db"
 METADATA_CSV = TDOC_INDEX / "metadata.csv"
 TOOL_CONFIG = ROOT / "tools.json"
+RESEARCH_TAXONOMY = ROOT / "config" / "research-taxonomy.json"
+REPORT_TEMPLATE = ROOT / "templates" / "research-report.md"
+TOOL_REGISTRY = ROOT / "tools" / "registry.json"
 
 OFFICIAL_HOSTS = {
     "3gpp.org",
@@ -140,7 +143,7 @@ def spec_archive_url(spec: str) -> str:
     normalized = spec.strip().replace("TS", "").replace("TR", "").replace(" ", "")
     match = re.fullmatch(r"(\d{2})\.?(\d{3})", normalized)
     if not match:
-        raise ValueError("spec must look like 38.331 or 38331")
+        raise ValueError("spec must look like NN.NNN or NNNNN")
     series, rest = match.groups()
     spec_id = f"{series}.{rest}"
     return f"https://www.3gpp.org/ftp/Specs/archive/{series}_series/{spec_id}/"
@@ -507,53 +510,101 @@ def relation_rows(db_path: Path = DEFAULT_DB, limit: int = 50) -> list[dict[str,
     return [dict(row) for row in rows]
 
 
-TASK_TYPES = {
-    "cr_trace": ["cr", "change request", "reason for change", "修改请求", "变更原因", "溯源"],
-    "release_comparison": ["release", "rel-", "rel ", "版本", "对比", "差异", "比较"],
-    "company_position": ["company", "公司", "厂商", "立场", "proposal", "contribution"],
-    "feature_evolution": ["evolution", "演进", "引入", "背景", "feature", "work item", "wi"],
-    "protocol_procedure": ["procedure", "流程", "handover", "re-establishment", "registration", "rrc", "nas"],
-    "ambiguity_or_conflict_check": ["ambiguity", "conflict", "歧义", "冲突", "不一致"],
-    "test_case_draft": ["test case", "测试用例", "tc"],
-}
+_TAXONOMY_CACHE: dict[str, object] | None = None
 
 
-SPEC_HINTS = [
-    ("38.331", ["38.331", "38331", "nr rrc", "5g rrc", "rrcsetup", "rrcreestablishment", "rrc re-establishment"]),
-    ("36.331", ["36.331", "36331", "lte rrc", "4g rrc", "rrcconnectionreestablishment"]),
-    ("38.300", ["38.300", "38300", "nr overall", "ng-ran", "5g architecture"]),
-    ("36.300", ["36.300", "36300", "e-utran", "lte overall", "4g architecture"]),
-    ("38.304", ["38.304", "38304", "nr cell selection", "cell reselection", "s-search", "小区选择", "小区重选"]),
-    ("36.304", ["36.304", "36304", "e-utra cell selection", "lte cell selection"]),
-    ("24.501", ["24.501", "24501", "5g nas", "registration", "pdu session", "amf", "5gc"]),
-    ("24.301", ["24.301", "24301", "eps nas", "attach", "tau", "mme", "4g nas"]),
-    ("38.413", ["38.413", "38413", "ngap", "n2", "amf"]),
-    ("36.413", ["36.413", "36413", "s1ap", "mme"]),
-    ("23.501", ["23.501", "23501", "system architecture", "5gs", "5gc", "slicing", "qos"]),
-    ("23.502", ["23.502", "23502", "5gs procedure", "service based", "registration procedure"]),
-]
+def load_json_file(path: Path, default: object) -> object:
+    if not path.exists():
+        return default
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def taxonomy() -> dict[str, object]:
+    global _TAXONOMY_CACHE
+    if _TAXONOMY_CACHE is None:
+        loaded = load_json_file(RESEARCH_TAXONOMY, {})
+        _TAXONOMY_CACHE = loaded if isinstance(loaded, dict) else {}
+    return _TAXONOMY_CACHE
+
+
+def tool_registry(path: Path = TOOL_REGISTRY) -> list[dict[str, object]]:
+    loaded = load_json_file(path, {"tools": []})
+    if not isinstance(loaded, dict):
+        return []
+    tools = loaded.get("tools", [])
+    return [tool for tool in tools if isinstance(tool, dict)] if isinstance(tools, list) else []
+
+
+def build_tool_plan(task_type: str) -> list[dict[str, object]]:
+    roles: list[str] = []
+    default_roles = taxonomy().get("default_tool_roles", [])
+    if isinstance(default_roles, list):
+        roles.extend(str(role) for role in default_roles)
+    task_roles = taxonomy().get("task_tool_roles", {})
+    if isinstance(task_roles, dict):
+        values = task_roles.get(task_type, [])
+        if isinstance(values, list):
+            roles.extend(str(role) for role in values)
+    deduped_roles = list(dict.fromkeys(roles))
+    registry = tool_registry()
+    plan: list[dict[str, object]] = []
+    for role in deduped_roles:
+        matched = []
+        for tool in registry:
+            tool_roles = tool.get("role", [])
+            if isinstance(tool_roles, list) and role in [str(item) for item in tool_roles]:
+                matched.append(str(tool.get("name", "")))
+        plan.append({"role": role, "tools": [name for name in matched if name]})
+    return plan
+
+
+def summarize_tool_plan(plan: list[dict[str, object]]) -> str:
+    parts: list[str] = []
+    for item in plan:
+        tools = item.get("tools", [])
+        tool_text = ", ".join(str(tool) for tool in tools) if isinstance(tools, list) and tools else "no registered tool"
+        parts.append(f"{item.get('role')}: {tool_text}")
+    return "; ".join(parts) if parts else "未生成工具计划"
+
+
+def contains_any(text: str, needles: Iterable[object]) -> bool:
+    lower = text.lower()
+    return any(str(needle).lower() in lower for needle in needles)
+
+
+def contains_all(text: str, needles: Iterable[object]) -> bool:
+    lower = text.lower()
+    return all(str(needle).lower() in lower for needle in needles)
+
+
+def rule_matches(text: str, rule: dict[str, object]) -> bool:
+    any_terms = rule.get("any", [])
+    all_terms = rule.get("all", [])
+    any_list = any_terms if isinstance(any_terms, list) else []
+    all_list = all_terms if isinstance(all_terms, list) else []
+    return (not any_list or contains_any(text, any_list)) and (not all_list or contains_all(text, all_list))
 
 
 def classify_task(question: str) -> str:
-    lower = question.lower()
-    for task_type, needles in TASK_TYPES.items():
-        if any(needle in lower for needle in needles):
-            return task_type
+    task_types = taxonomy().get("task_types", {})
+    if isinstance(task_types, dict):
+        for task_type, needles in task_types.items():
+            if contains_any(question, needles if isinstance(needles, list) else []):
+                return str(task_type)
     return "clause_explanation" if re.search(r"\b\d+(?:\.\d+){1,4}\b", question) else "general_research"
 
 
 def infer_specs(question: str, explicit_specs: list[str] | None = None) -> list[str]:
     specs = normalize_specs(explicit_specs or [])
-    lower = question.lower()
     for match in re.finditer(r"\b(?:TS|TR)?\s?(\d{2})\.?(\d{3})\b", question, flags=re.I):
         specs.append(f"{match.group(1)}.{match.group(2)}")
-    for spec, hints in SPEC_HINTS:
-        if any(hint in lower for hint in hints):
-            specs.append(spec)
-    if ("4g" in lower or "lte" in lower) and "rrc" in lower:
-        specs.append("36.331")
-    if ("5g" in lower or "nr" in lower) and "rrc" in lower:
-        specs.append("38.331")
+    for item in taxonomy().get("spec_hints", []):
+        if isinstance(item, dict) and contains_any(question, item.get("keywords", []) if isinstance(item.get("keywords"), list) else []):
+            if item.get("spec"):
+                specs.append(str(item["spec"]))
+    for rule in taxonomy().get("spec_cooccurrence_rules", []):
+        if isinstance(rule, dict) and rule_matches(question, rule) and rule.get("spec"):
+            specs.append(str(rule["spec"]))
     return sorted(set(specs))
 
 
@@ -568,31 +619,17 @@ def normalize_specs(values: list[str]) -> list[str]:
 
 def research_queries(question: str, task_type: str, specs: list[str]) -> list[str]:
     queries = [question]
-    lower = question.lower()
-    if "rrcsetup" in lower or "rrc setup" in lower:
-        queries.extend(["RRCSetup", "RRCSetup fallback", "RRC establishment"])
-    if "re-establishment" in lower or "reestablishment" in lower or "重建" in lower:
-        queries.extend(
-            [
-                "RRC re-establishment",
-                "RRC connection re-establishment",
-                "RRCReestablishmentRequest RRCReestablishment RRCReestablishmentComplete",
-                "RRCConnectionReestablishmentRequest RRCConnectionReestablishment RRCConnectionReestablishmentComplete",
-                "fallback RRCSetup",
-                "valid UE context",
-                "AS security activated",
-            ]
-        )
-    if "cell selection" in lower or "小区选择" in question:
-        queries.extend(["cell selection", "cell reselection", "suitable cell", "acceptable cell"])
-    if "registration" in lower or "注册" in question:
-        queries.extend(["registration procedure", "Registration Request", "Registration Accept"])
-    if task_type == "cr_trace":
-        queries.extend(["reason for change", "change request", "affected clauses"])
-    if task_type == "release_comparison":
-        queries.extend(["release", "introduced", "modified", "change"])
-    for spec in specs:
-        queries.append(spec)
+    for rule in taxonomy().get("query_expansion_rules", []):
+        if isinstance(rule, dict) and rule_matches(question, rule):
+            query_values = rule.get("queries", [])
+            if isinstance(query_values, list):
+                queries.extend(str(query) for query in query_values)
+    task_expansions = taxonomy().get("task_query_expansions", {})
+    if isinstance(task_expansions, dict):
+        values = task_expansions.get(task_type, [])
+        if isinstance(values, list):
+            queries.extend(str(query) for query in values)
+    queries.extend(specs)
     deduped: list[str] = []
     seen: set[str] = set()
     for query in queries:
@@ -606,27 +643,20 @@ def research_queries(question: str, task_type: str, specs: list[str]) -> list[st
 def evidence_rank(row: dict[str, str]) -> int:
     text = f"{row.get('query', '')} {row.get('title', '')} {row.get('snippet', '')} {row.get('text', '')}".lower()
     score = 0
-    for needle, value in {
-        "procedure": 15,
-        "purpose": 12,
-        "shall": 10,
-        "rrcsetup": 18,
-        "re-establishment": 18,
-        "valid ue context": 20,
-        "reason for change": 22,
-        "change request": 18,
-        "meeting report": 18,
-        "approved": 12,
-        "agreed": 12,
-    }.items():
-        if needle in text:
-            score += value
+    for item in taxonomy().get("rank_terms", []):
+        if not isinstance(item, dict):
+            continue
+        term = str(item.get("term", "")).lower()
+        if term and term in text:
+            score += int(item.get("score", 0))
+    boosts = taxonomy().get("rank_boosts", {})
+    boosts = boosts if isinstance(boosts, dict) else {}
     if row.get("official_url"):
-        score += 20
+        score += int(boosts.get("official_url", 0))
     if row.get("spec_id"):
-        score += 8
+        score += int(boosts.get("spec_id", 0))
     if row.get("tdoc_id") or row.get("cr_id"):
-        score += 10
+        score += int(boosts.get("tdoc_or_cr", 0))
     return score
 
 
@@ -659,19 +689,16 @@ def clean_md(value: object, length: int = 260) -> str:
 
 def source_type(row: dict[str, str]) -> str:
     doc_type = (row.get("document_type") or "").lower()
-    if doc_type == "spec":
-        return "TS"
-    if doc_type == "cr":
-        return "CR"
-    if doc_type == "tdoc":
-        return "TDoc"
-    if doc_type == "meeting_report":
-        return "Meeting Report"
+    mapping = taxonomy().get("document_type_map", {})
+    if isinstance(mapping, dict) and doc_type in mapping:
+        return str(mapping[doc_type])
     return doc_type or "document"
 
 
 def evidence_status(row: dict[str, str]) -> str:
-    if row.get("official_url") and source_type(row) in {"TS", "TR", "CR", "TDoc", "Meeting Report"}:
+    official_types = taxonomy().get("official_source_types", [])
+    official_types = set(str(item) for item in official_types) if isinstance(official_types, list) else set()
+    if row.get("official_url") and source_type(row) in official_types:
         return "confirmed"
     if row.get("official_url"):
         return "evidence-grounded"
@@ -681,19 +708,17 @@ def evidence_status(row: dict[str, str]) -> str:
 def evidence_claim(row: dict[str, str]) -> str:
     text = f"{row.get('snippet', '')} {row.get('text', '')}".lower()
     spec = row.get("spec_id") or row.get("source_id") or "本地资料"
-    if "fallback" in text and "rrc establishment" in text and "successful" in text:
-        return f"{spec} 中出现 RRC re-establishment fallback to RRC establishment 的成功路径线索。"
-    if "not able to retrieve or verify" in text and "rrcsetup" in text:
-        return f"{spec} 中出现网络无法 retrieve/verify UE context 时由 RRCSetup 承接的证据线索。"
-    if "valid ue context" in text and "connection re-establishment succeeds" in text:
-        return f"{spec} 中出现 connection re-establishment 成功依赖 valid UE context 的证据线索。"
-    if "rrcsetup ::=" in text or "network to ue rrcsetup" in text:
-        return f"{spec} 中包含 RRCSetup 消息定义，可用于核验 fallback 分支中的消息语义。"
-    if "rrcreestablishmentrequest" in text or "rrcconnectionreestablishmentrequest" in text:
-        return f"{spec} 中包含 RRC re-establishment 请求/响应消息相关证据。"
-    if "reason for change" in text:
-        return f"{spec} 中出现 CR reason for change 线索，可用于追踪修改动机。"
-    return f"{spec} 中存在与检索问题 `{row.get('query')}` 相关的证据片段。"
+    for rule in taxonomy().get("claim_rules", []):
+        if not isinstance(rule, dict):
+            continue
+        all_terms = rule.get("contains_all", [])
+        any_terms = rule.get("contains_any", [])
+        all_match = not isinstance(all_terms, list) or not all_terms or contains_all(text, all_terms)
+        any_match = not isinstance(any_terms, list) or not any_terms or contains_any(text, any_terms)
+        if all_match and any_match and rule.get("claim"):
+            return str(rule["claim"]).format(source=spec, query=row.get("query", ""))
+    fallback = taxonomy().get("fallback_claim", "{source} evidence matched query `{query}`.")
+    return str(fallback).format(source=spec, query=row.get("query", ""))
 
 
 def infer_pointer(row: dict[str, str]) -> str:
@@ -714,6 +739,17 @@ def report_path_for(question: str, output: str | None) -> Path:
     return runs / f"{stamp}-{slug}.md"
 
 
+def render_report_template(values: dict[str, str], template_path: Path = REPORT_TEMPLATE) -> str:
+    template = template_path.read_text(encoding="utf-8")
+    for key, value in values.items():
+        template = template.replace("{{" + key + "}}", value)
+    return re.sub(r"\{\{[A-Za-z0-9_]+\}\}", "", template).rstrip() + "\n"
+
+
+def bullet_list(items: list[str], empty: str) -> str:
+    return "\n".join(f"- {item}" for item in items) if items else f"- {empty}"
+
+
 def generate_research_report(
     question: str,
     task_type: str,
@@ -721,200 +757,128 @@ def generate_research_report(
     evidence: list[dict[str, str]],
     relations: list[dict[str, str]],
     downloaded: list[str],
+    tool_plan: list[dict[str, object]],
 ) -> str:
     source_rows: dict[str, dict[str, str]] = {}
     for row in evidence:
         source_rows.setdefault(str(row.get("source_id", "")), row)
     source_inventory = list(source_rows.values())
     evidence_ids = {id(row): f"E{idx:03d}" for idx, row in enumerate(evidence, start=1)}
-    has_cr_or_tdoc = any(source_type(row) in {"CR", "TDoc", "Meeting Report"} for row in evidence)
+    official_types = set(str(item) for item in taxonomy().get("official_source_types", []) if isinstance(item, str))
+    has_official_process_evidence = any(source_type(row) in official_types and source_type(row) not in {"TS", "TR"} for row in evidence)
 
-    lines = [
-        f"# {question} 深度研究报告",
-        "",
-        "> 本报告由 `3gpp-research-kit research` 生成。它是证据优先的深度研究草案：只把已检索到官方 URL 或本地可追溯来源的内容列为 confirmed/evidence-grounded；CR、TDoc、Meeting Report 覆盖不足时，相关结论保持待核验。",
-        "",
-        "## 1. 结论摘要",
-        "",
-    ]
+    summary_items: list[str] = []
     if evidence:
-        lines.extend(
+        summary_items.extend(
             [
-                f"- `evidence-grounded` 本次研究已建立本地 evidence database，并检索到 {len(evidence)} 条候选证据片段；主要候选规范为：{', '.join(specs) if specs else '未由问题自动识别，需人工补充'}。",
-                f"- `evidence-grounded` 最高相关证据来自 {clean_md(evidence[0].get('spec_id') or source_type(evidence[0]))}，定位为 `chunk_index={clean_md(evidence[0].get('chunk_index'))}`，应作为人工精读的第一入口。",
-                "- `evidence-grounded` 当前报告可以支持资料定位、证据表整理和初步主题分析；最终标准判断仍应回到具体 clause、CR reason for change、TDoc 或 Meeting Report 复核。",
+                f"`evidence-grounded` 本次研究已建立本地 evidence database，并检索到 {len(evidence)} 条候选证据片段；主要候选规范为：{', '.join(specs) if specs else '未由问题自动识别，需人工补充'}。",
+                f"`evidence-grounded` 最高相关证据来自 {clean_md(evidence[0].get('spec_id') or source_type(evidence[0]))}，定位为 `chunk_index={clean_md(evidence[0].get('chunk_index'))}`，应作为人工精读的第一入口。",
+                "`evidence-grounded` 当前报告可以支持资料定位、证据表整理和初步主题分析；最终标准判断仍应回到具体 clause、CR reason for change、TDoc 或 Meeting Report 复核。",
             ]
         )
     else:
-        lines.append("- `needs_verification` 本次未检索到足够证据，不能生成 confirmed 标准结论。")
-    if not has_cr_or_tdoc:
-        lines.append("- `needs_verification` 当前证据集中未覆盖足够 CR、TDoc 或 Meeting Report，不能确认设计动机、会议结论或公司立场。")
-    lines.append("- `needs_verification` 如果本问题涉及 Release 演进或规范差异，还需要补充版本 diff 或 CR 级证据。")
+        summary_items.append("`needs_verification` 本次未检索到足够证据，不能生成已核验的标准结论。")
+    if not has_official_process_evidence:
+        summary_items.append("`needs_verification` 当前证据集中未覆盖足够过程性资料，不能确认设计动机、会议结论或公司立场。")
+    summary_items.append("`needs_verification` 如果本问题涉及 Release 演进或规范差异，还需要补充版本 diff 或 CR 级证据。")
 
-    lines.extend(
-        [
-            "",
-            "## 2. 研究范围与问题拆解",
-            "",
-            f"- 研究问题：{question}",
-            f"- 任务类型：{task_type}",
-            f"- 候选 TS/TR：{', '.join(specs) if specs else '未自动识别，需要人工指定 `--spec`'}",
-            f"- 本次下载动作：{'; '.join(clean_md(item, 180) for item in downloaded) if downloaded else '未下载新资料，复用本地 incoming/index'}",
-            "- 覆盖范围：本地 incoming 资料、已解析文本、SQLite FTS 检索库和基础关系表。",
-            "- 排除范围：未被下载或导入的 CR/TDoc/Meeting Report、未解析成功的 PDF/扫描件、厂商实现差异和外场日志。",
-            "",
-            "## 3. 规范依据",
-            "",
-            "| 功能 / 子问题 | 主要规范或资料 | 作用 | 证据状态 |",
-            "| --- | --- | --- | --- |",
-        ]
-    )
+    source_inventory_rows: list[str] = []
     if source_inventory:
         for row in source_inventory[:10]:
             role = "主要证据" if row.get("spec_id") in specs else "辅助证据"
             status = "evidence-grounded" if evidence_status(row) == "confirmed" else evidence_status(row)
-            lines.append(
+            source_inventory_rows.append(
                 f"| {clean_md(row.get('query'), 120)} | {clean_md(row.get('spec_id') or row.get('tdoc_id') or row.get('title'))} | {role} | {status} |"
             )
     else:
-        lines.append("| 资料定位 | 待补充 | 当前证据不足 | needs_verification |")
+        source_inventory_rows.append("| 资料定位 | 待补充 | 当前证据不足 | needs_verification |")
 
-    lines.extend(
-        [
-            "",
-            "## 4. Evidence Table / 证据表",
-            "",
-            "| id | claim | source_type | source_id | version_or_release | clause_or_section | evidence_summary | quote_or_pointer | status |",
-            "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-        ]
-    )
+    evidence_table_rows: list[str] = []
     for idx, row in enumerate(evidence[:18], start=1):
         eid = f"E{idx:03d}"
         claim = evidence_claim(row)
         source_id = row.get("spec_id") or row.get("tdoc_id") or row.get("cr_id") or row.get("source_id")
         pointer = f"{row.get('official_url') or row.get('source_path')}; {infer_pointer(row)}"
-        lines.append(
+        evidence_table_rows.append(
             f"| {eid} | {clean_md(claim, 220)} | {clean_md(source_type(row))} | {clean_md(source_id)} | 待核验 | {clean_md(infer_pointer(row), 120)} | {clean_md(row.get('snippet') or row.get('text'), 360)} | {clean_md(pointer, 360)} | {evidence_status(row)} |"
         )
+    if not evidence_table_rows:
+        evidence_table_rows.append("| E001 | 当前证据不足 | document | 待补充 | 待核验 | 待补充 | 待补充 | 待补充 | needs_verification |")
 
-    lines.extend(
-        [
-            "",
-            "## 5. 分主题分析",
-            "",
-            "### 5.1 直接证据解读",
-            "",
-        ]
-    )
-    if evidence:
-        for idx, row in enumerate(evidence[:6], start=1):
-            lines.append(
-                f"- E{idx:03d}: {clean_md(evidence_claim(row), 240)} 该线索来自 `{clean_md(row.get('spec_id') or row.get('source_id'))}`，定位为 `{clean_md(infer_pointer(row), 120)}`。"
-            )
+    direct_items: list[str] = []
+    for idx, row in enumerate(evidence[:6], start=1):
+        direct_items.append(
+            f"E{idx:03d}: {clean_md(evidence_claim(row), 240)} 该线索来自 `{clean_md(row.get('spec_id') or row.get('source_id'))}`，定位为 `{clean_md(infer_pointer(row), 120)}`。"
+        )
+
+    coverage_items: list[str] = []
+    for row in source_inventory[:8]:
+        eid = next((evidence_ids[id(item)] for item in evidence if item.get("source_id") == row.get("source_id")), "")
+        coverage_items.append(
+            f"{eid}: `{clean_md(row.get('spec_id') or row.get('tdoc_id') or row.get('source_id'))}` 提供了与 `{clean_md(row.get('query'), 100)}` 相关的证据入口；证据表状态见第 4 节。"
+        )
+
+    boundary_items = [
+        "标准事实只能来自 Evidence Table 中可追溯的来源；本报告不把未定位到 clause/CR/TDoc 的内容写成最终结论。",
+        "检索片段可用于定位精读范围，但 chunk 命中不等于完整 clause 解释；专业交付前应回到原文上下文复核。",
+    ]
+    if has_official_process_evidence:
+        boundary_items.append("当前证据中已出现过程性资料，可继续追踪变更原因、会议状态和关联规范修改。")
     else:
-        lines.append("- 当前无足够证据，不能做直接证据解读。")
+        boundary_items.append("当前证据尚未充分覆盖过程性资料，因此设计动机、公司立场和会议结论均保持待核验。")
 
-    lines.extend(
-        [
-            "",
-            "### 5.2 资料覆盖度",
-            "",
-        ]
-    )
-    if source_inventory:
-        for row in source_inventory[:8]:
-            eid = next((evidence_ids[id(item)] for item in evidence if item.get("source_id") == row.get("source_id")), "")
-            lines.append(
-                f"- {eid}: `{clean_md(row.get('spec_id') or row.get('tdoc_id') or row.get('source_id'))}` 提供了与 `{clean_md(row.get('query'), 100)}` 相关的证据入口；证据表状态见第 4 节。"
-            )
-    else:
-        lines.append("- 当前资料覆盖不足，需要先补充 TS/TR、CR、TDoc 或 Meeting Report。")
-
-    lines.extend(["", "### 5.3 标准事实与解释边界", ""])
-    lines.append("- 标准事实只能来自 Evidence Table 中可追溯的来源；本报告不把未定位到 clause/CR/TDoc 的内容写成最终结论。")
-    lines.append("- 检索片段可用于定位精读范围，但 chunk 命中不等于完整 clause 解释；专业交付前应回到原文上下文复核。")
-    if has_cr_or_tdoc:
-        lines.append("- 当前证据中已出现 CR/TDoc/Meeting 类型材料，可继续追踪 reason for change、会议状态和关联规范修改。")
-    else:
-        lines.append("- 当前证据尚未充分覆盖 CR/TDoc/Meeting Report，因此设计动机、公司立场和会议结论均保持待核验。")
-
-    lines.extend(
-        [
-            "",
-            "### 5.4 关系线索",
-            "",
-            "| source_type | source_id | relation | target_type | target_id | status |",
-            "| --- | --- | --- | --- | --- | --- |",
-        ]
-    )
+    relation_table_rows: list[str] = []
     if relations:
         for row in relations[:12]:
             relation_status = row.get("verification_status")
             if relation_status == "confirmed":
                 relation_status = "evidence-grounded"
-            lines.append(
+            relation_table_rows.append(
                 f"| {clean_md(row.get('source_type'))} | {clean_md(row.get('source_id'))} | {clean_md(row.get('relation'))} | {clean_md(row.get('target_type'))} | {clean_md(row.get('target_id'))} | {clean_md(relation_status)} |"
             )
     else:
-        lines.append("| 待补充 | 待补充 | 待补充 | 待补充 | 待补充 | needs_verification |")
+        relation_table_rows.append("| 待补充 | 待补充 | 待补充 | 待补充 | 待补充 | needs_verification |")
 
-    lines.extend(
-        [
-            "",
-            "## 6. 对比矩阵",
-            "",
-            "| axis | A evidence | B evidence | similarity | difference | status |",
-            "| --- | --- | --- | --- | --- | --- |",
-        ]
-    )
+    comparison_rows: list[str] = []
+    axes = taxonomy().get("comparison_axes", [])
+    axes = axes if isinstance(axes, list) else []
     if len(specs) >= 2:
-        for axis in ["资料覆盖", "过程/消息证据", "版本或系统差异", "待核验项"]:
+        for axis in axes:
             a = next((row for row in evidence if row.get("spec_id") == specs[0]), {})
             b = next((row for row in evidence if row.get("spec_id") == specs[1]), {})
-            lines.append(
-                f"| {axis} | {clean_md(a.get('snippet') or a.get('title'), 220)} | {clean_md(b.get('snippet') or b.get('title'), 220)} | 均需回到官方原文核验。 | 当前仅比较检索命中，不替代 clause 级差异分析。 | evidence-grounded |"
+            comparison_rows.append(
+                f"| {clean_md(axis)} | {clean_md(a.get('snippet') or a.get('title'), 220)} | {clean_md(b.get('snippet') or b.get('title'), 220)} | 均需回到官方原文核验。 | 当前仅比较检索命中，不替代 clause 级差异分析。 | evidence-grounded |"
             )
     else:
-        lines.append("| 单资料范围 | 当前主要是单规范/单主题证据定位 | 待补充第二组资料 | 不适用 | 如需对比，请补充 `--spec` 或 Release/CR 范围 | needs_verification |")
+        comparison_rows.append("| 单资料范围 | 当前主要是单规范/单主题证据定位 | 待补充第二组资料 | 不适用 | 如需对比，请补充 `--spec` 或 Release/CR 范围 | needs_verification |")
 
-    lines.extend(
-        [
-            "",
-            "## 7. 图示",
-            "",
-            "```mermaid",
-            "flowchart TD",
-            "  A[\"Research question\"] --> B[\"Infer task type and candidate specs\"]",
-            "  B --> C[\"Fetch or reuse official materials\"]",
-            "  C --> D[\"Parse and build SQLite FTS\"]",
-            "  D --> E[\"Retrieve evidence snippets\"]",
-            "  E --> F[\"Build evidence table\"]",
-            "  F --> G[\"List verification gaps\"]",
-            "```",
-            "",
-            "## 8. 常见误区和边界澄清",
-            "",
-            "- 不要把 FTS 命中的片段直接等同于完整 clause 结论。",
-            "- 不要把 TS/TR 的最终文本、CR 的修改理由、TDoc 的会议贡献和 Meeting Report 的会议结论混为一类证据。",
-            "- 如果 DOCX 来自 CR/TDoc，应保留 Word 修订模式中的新增/删除标记，避免把删除内容当作当前有效条文。",
-            "- 第三方网页、专利背景或模型总结只能作为辅助入口，不能替代 3GPP 官方来源。",
-            "",
-            "## 9. 未确认点与后续核验建议",
-            "",
-            "| 未确认点 | 为什么未确认 | 后续应查 |",
-            "| --- | --- | --- |",
-            "| clause 级定位 | 当前自动报告使用 chunk_index，未保证抽取到完整 clause 边界 | 回到 processed 文本或官方 DOCX，补充 clause 编号和原文上下文 |",
-            "| CR / TDoc / Meeting Report 溯源 | 本地检索未必覆盖相关会议资料 | 查询 3GPP Portal、FTP Docs 目录和 Meeting Report |",
-            "| Release 差异 | 未自动完成版本间 diff | 下载目标版本 archive，进行 clause diff 和 CR trace |",
-            "| 工程影响 | 标准文本不能直接代表具体实现行为 | 结合实现文档、日志、测试规范和专家复核 |",
-            "",
-            "## 10. 可复用总结",
-            "",
-            f"本次研究围绕“{question}”建立了可复核的本地证据链。当前最可靠的结论是：已定位到候选规范/资料和证据片段，但任何涉及设计动机、Release 演进、CR 原因、会议结论或公司立场的判断，都需要继续补充 CR、TDoc 和 Meeting Report 后才能从 `needs_verification` 升级为 `confirmed`。这份报告适合作为专业读者继续精读官方原文和补充证据的工作底稿。",
-        ]
+    open_item_rows: list[str] = []
+    for item in taxonomy().get("verification_open_items", []):
+        if isinstance(item, dict):
+            open_item_rows.append(f"| {clean_md(item.get('item'))} | {clean_md(item.get('reason'))} | {clean_md(item.get('next_step'))} |")
+    if not open_item_rows:
+        open_item_rows.append("| 待补充 | 证据配置未提供 | 补充 config/research-taxonomy.json |")
+
+    return render_report_template(
+        {
+            "question": question,
+            "task_type": task_type,
+            "specs": ", ".join(specs) if specs else "未自动识别，需要人工指定 `--spec`",
+            "downloaded": "; ".join(clean_md(item, 180) for item in downloaded) if downloaded else "未下载新资料，复用本地 incoming/index",
+            "tool_plan_summary": clean_md(summarize_tool_plan(tool_plan), 800),
+            "summary_bullets": bullet_list(summary_items, "当前没有可报告结论。"),
+            "source_inventory_rows": "\n".join(source_inventory_rows),
+            "evidence_table_rows": "\n".join(evidence_table_rows),
+            "direct_evidence_bullets": bullet_list(direct_items, "当前无足够证据，不能做直接证据解读。"),
+            "coverage_bullets": bullet_list(coverage_items, "当前资料覆盖不足，需要先补充 TS/TR、CR、TDoc 或 Meeting Report。"),
+            "boundary_bullets": bullet_list(boundary_items, "暂无边界说明。"),
+            "relation_rows": "\n".join(relation_table_rows),
+            "patent_background_rows": "| 待补充 | 待补充 | 待补充 | 待补充 | 待补充 | 需要 CR/TDoc/Meeting Report 交叉核验 | auxiliary_background |",
+            "comparison_rows": "\n".join(comparison_rows),
+            "open_item_rows": "\n".join(open_item_rows),
+            "reusable_summary": f"本次研究围绕“{question}”建立了可复核的本地证据链。当前最可靠的结论是：已定位到候选规范/资料和证据片段，但任何涉及设计动机、Release 演进、CR 原因、会议结论或公司立场的判断，都需要继续补充过程性证据后才能升级为已核验结论。这份报告适合作为专业读者继续精读官方原文和补充证据的工作底稿。",
+        }
     )
-    return "\n".join(lines) + "\n"
-
 
 def run_deep_research(args: argparse.Namespace) -> dict[str, object]:
     input_dir = Path(args.input)
@@ -922,6 +886,7 @@ def run_deep_research(args: argparse.Namespace) -> dict[str, object]:
     db_path = Path(args.db)
     task_type = classify_task(args.question)
     specs = infer_specs(args.question, args.spec)
+    tool_plan = build_tool_plan(task_type)
     downloaded: list[str] = []
     if not args.no_fetch:
         for spec in specs:
@@ -933,7 +898,7 @@ def run_deep_research(args: argparse.Namespace) -> dict[str, object]:
     build_db(metadata, db_path)
     evidence = collect_research_evidence(args.question, task_type, specs, db_path, args.limit)
     relation_data = relation_rows(db_path, limit=40)
-    report = generate_research_report(args.question, task_type, specs, evidence, relation_data, downloaded)
+    report = generate_research_report(args.question, task_type, specs, evidence, relation_data, downloaded, tool_plan)
     output = report_path_for(args.question, args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(report, encoding="utf-8")
@@ -943,6 +908,7 @@ def run_deep_research(args: argparse.Namespace) -> dict[str, object]:
         "task_type": task_type,
         "specs": specs,
         "downloaded": downloaded,
+        "tool_plan": tool_plan,
         "parsed_records": len(records),
         "evidence_count": len(evidence),
         "relations_count": len(relation_data),
@@ -961,6 +927,8 @@ def check_tools(path: Path = TOOL_CONFIG) -> list[dict[str, str]]:
     config = load_tool_config(path)
     results: list[dict[str, str]] = []
     for name, spec in config.items():
+        if name.startswith("_") or spec.get("type") == "metadata":
+            continue
         command = spec.get("command", "")
         executable = command.split()[0] if command else ""
         found = shutil.which(executable) if executable else None
@@ -980,6 +948,7 @@ def run_tool(name: str, args: list[str], path: Path = TOOL_CONFIG) -> int:
     import subprocess
 
     config = load_tool_config(path)
+    config = {key: value for key, value in config.items() if not key.startswith("_") and value.get("type") != "metadata"}
     if name not in config:
         print(f"Unknown tool {name!r}. Add it to {path}.", file=sys.stderr)
         return 2
@@ -1094,13 +1063,13 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=textwrap.dedent(
             """
             Examples:
-              python scripts/3gpp_research.py fetch-spec --spec 38.331 --latest
-              python scripts/3gpp_research.py fetch --url https://www.3gpp.org/ftp/tsg_ran/WG2_RL2/TSGR2_104/Docs/R2-1817862.zip
+              python scripts/3gpp_research.py fetch-spec --spec <spec-id> --latest
+              python scripts/3gpp_research.py fetch --url <official-url>
               python scripts/3gpp_research.py fetch-list --file urls.txt
               python scripts/3gpp_research.py parse
               python scripts/3gpp_research.py build-db
-              python scripts/3gpp_research.py search "RRCSetup fallback"
-              python scripts/3gpp_research.py research "请分析 RRCSetup 在 RRC re-establishment fallback 场景中的作用" --spec 38.331
+              python scripts/3gpp_research.py search "<keyword>"
+              python scripts/3gpp_research.py research "<research question>" --spec <spec-id>
             """
         ),
     )
@@ -1117,7 +1086,7 @@ def build_parser() -> argparse.ArgumentParser:
     fetch_list.set_defaults(func=cmd_fetch_list)
 
     fetch_spec = sub.add_parser("fetch-spec", help="Download a ZIP from the official 3GPP Specs archive")
-    fetch_spec.add_argument("--spec", required=True, help="Spec id, e.g. 38.331")
+    fetch_spec.add_argument("--spec", required=True, help="Spec id, format NN.NNN or NNNNN")
     fetch_spec.add_argument("--version", help="Optional archive version token, e.g. i20 or 18.2.0 if present in filename")
     fetch_spec.add_argument("--latest", action="store_true", help="Download the lexically latest archive ZIP")
     fetch_spec.add_argument("--out", default=str(TDOC_INCOMING))
@@ -1160,7 +1129,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     research = sub.add_parser("research", help="Run one-click evidence-grounded deep research and write a report")
     research.add_argument("question", help="Research question or topic")
-    research.add_argument("--spec", action="append", default=[], help="Candidate TS/TR spec id, e.g. 38.331. Can be repeated.")
+    research.add_argument("--spec", action="append", default=[], help="Candidate TS/TR spec id. Can be repeated.")
     research.add_argument("--version", help="Optional archive version token when fetching specs")
     research.add_argument("--latest", action="store_true", help="Fetch the lexically latest archive for inferred/explicit specs")
     research.add_argument("--no-fetch", action="store_true", help="Reuse local incoming/index materials without downloading specs")

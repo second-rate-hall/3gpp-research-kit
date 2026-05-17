@@ -1,0 +1,68 @@
+{
+  "tools": [
+    {
+      "name": "local_cli",
+      "type": "local_cli",
+      "role": ["acquisition", "parsing", "indexing", "retrieval", "verification", "reporting"],
+      "command": "python scripts/3gpp_research.py",
+      "evidence_status": "depends_on_source"
+    },
+    {
+      "name": "local_fts",
+      "type": "rag",
+      "role": ["evidence_retrieval"],
+      "command": "python scripts/3gpp_research.py search",
+      "evidence_status": "evidence-grounded"
+    },
+    {
+      "name": "3gpp_mcp",
+      "type": "mcp",
+      "role": ["source_discovery", "spec_discovery", "requirement_lookup"],
+      "command": "3gpp-mcp",
+      "evidence_status": "needs_official_verification"
+    },
+    {
+      "name": "teddi",
+      "type": "mcp",
+      "role": ["terminology"],
+      "command": "teddi",
+      "evidence_status": "evidence-grounded"
+    },
+    {
+      "name": "telco_rag",
+      "type": "rag",
+      "role": ["evidence_retrieval", "reranking"],
+      "command": "telco-rag",
+      "evidence_status": "needs_official_verification"
+    },
+    {
+      "name": "chat3gpp",
+      "type": "rag",
+      "role": ["evidence_retrieval"],
+      "command": "chat3gpp",
+      "evidence_status": "needs_official_verification"
+    },
+    {
+      "name": "graphrag",
+      "type": "graph",
+      "role": ["relation_reasoning", "evolution_trace", "company_position_trace"],
+      "source": "graphrag/schema.md",
+      "evidence_status": "depends_on_relation_source"
+    },
+    {
+      "name": "patent_mcp",
+      "type": "mcp",
+      "role": ["auxiliary_background", "pain_point_inference"],
+      "command": "python mcp/patent-mcp-server.py",
+      "evidence_status": "auxiliary_background"
+    },
+    {
+      "name": "online_search",
+      "type": "source_discovery",
+      "role": ["source_discovery", "gap_filling"],
+      "source": "sources/online-search-playbook.md",
+      "recipes": "sources/search-recipes.json",
+      "evidence_status": "needs_official_verification"
+    }
+  ]
+}

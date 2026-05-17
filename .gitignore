@@ -21,5 +21,7 @@ tools.json
 # Local caches and temporary files
 .cache/
 tmp/
+__pycache__/
+*.py[cod]
 *.log
 *.tmp

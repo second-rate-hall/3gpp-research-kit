@@ -1,4 +1,9 @@
 {
+  "_note": {
+    "type": "metadata",
+    "command": "",
+    "notes": "Runtime command examples only. The canonical tool role registry is tools/registry.json."
+  },
   "teddi": {
     "type": "terminology",
     "command": "teddi",

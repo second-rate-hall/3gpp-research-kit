@@ -1,12 +1,12 @@
 # 3GPP Research Kit
 
-`3gpp-research-kit` is an evidence-first workbench for researching 3GPP standards with local files, official sources, and AI coding agents such as Codex, Claude CLI, or similar workspace agents.
+`3gpp-research-kit` 是一个证据优先的 3GPP 标准研究工作台，用于结合本地文件、官方来源，以及 Codex、Claude CLI 或类似的工作区 Agent 来开展标准研究。
 
-It is not a chatbot and it does not claim to contain all 3GPP knowledge. Its purpose is narrower and more useful: help you turn a standards question into a reproducible research run with source inventory, evidence table, verification status, and a report that can be checked against official 3GPP material.
+它不是聊天机器人，也不声称内置了全部 3GPP 知识。它的目标更窄，也更实用：帮助你把一个标准问题转化为一次可复现的研究过程，包含资料清单、证据表、核验状态，以及可回到 3GPP 官方材料检查的研究报告。
 
-## Why This Exists
+## 为什么需要它
 
-3GPP answers are rarely contained in one paragraph. A serious analysis often needs to connect:
+3GPP 问题的答案很少只藏在一个段落里。严肃分析通常需要串联：
 
 ```text
 TS/TR clause
@@ -16,25 +16,33 @@ TS/TR clause
 -> Work Item / Release context
 ```
 
-This repository gives you a local project structure and CLI for that workflow:
+本仓库为这套工作流提供本地项目结构和 CLI：
 
-- Download or reuse official 3GPP files.
-- Parse ZIP / DOCX / TXT / MD / CSV / HTML files.
-- Preserve Word track-change intent in DOCX parsing.
-- Build a local SQLite FTS evidence database.
-- Search evidence and inspect basic relation rows.
-- Generate a conservative deep research report.
-- Verify that `confirmed` claims have obvious source markers.
+- 下载或复用 3GPP 官方文件。
+- 本地资料不足时，按内置在线搜索 playbook 和 search recipes 发现官方来源。
+- 解析 ZIP / DOCX / TXT / MD / CSV / HTML 文件。
+- 在解析 DOCX 时保留 Word 修订痕迹的意图。
+- 构建本地 SQLite FTS 证据数据库。
+- 检索证据并查看基础关系行。
+- 生成保守的深度研究报告。
+- 检查 `confirmed` 结论是否带有明确来源标记。
 
-## Quick Start
+领域规则和报告结构不写死在 Python 代码中：
 
-Clone the repository and run commands from the project root.
+- `config/research-taxonomy.json` 保存任务分类、候选规范提示、检索扩展、排序规则和 claim 规则。
+- `templates/research-report.md` 保存一键研究报告模板。
+- `tools/registry.json` 保存 MCP、RAG、GraphRAG、专利背景、本地 CLI 等工具角色。
+- `sources/search-recipes.json` 和 `sources/online-search-playbook.md` 保存本地无资料时的在线搜索方法。
+
+## 快速开始
+
+克隆仓库，并在项目根目录运行命令。
 
 ```bash
 python scripts/3gpp_research.py --help
 ```
 
-Run a minimal evidence loop:
+运行一个最小证据闭环：
 
 ```bash
 python scripts/3gpp_research.py fetch-spec --spec 38.331 --latest
@@ -43,17 +51,17 @@ python scripts/3gpp_research.py build-db
 python scripts/3gpp_research.py search "RRCSetup fallback" --limit 5
 ```
 
-Run one-click deep research:
+运行一键深度研究：
 
 ```bash
 python scripts/3gpp_research.py research "请分析 RRCSetup 在 RRC re-establishment fallback 场景中的作用" --spec 38.331 --latest
 ```
 
-The report is written under `research-runs/` and then checked with the built-in evidence verifier.
+报告会写入 `research-runs/`，随后由内置证据核验器检查。
 
-## Use With Codex Or Another Workspace Agent
+## 与 Codex 或其他工作区 Agent 配合使用
 
-Open this repository in your agent tool and ask it to follow the project workflow:
+在你的 Agent 工具中打开本仓库，并要求它遵循项目工作流：
 
 ```text
 Read README.md, SKILL.md, workflows/, scripts/, sources/, TDoc/README.md,
@@ -62,24 +70,24 @@ then perform evidence-grounded 3GPP research for this question:
 <your question>
 ```
 
-The agent should use the local CLI and templates instead of answering from model memory.
+Agent 应使用本地 CLI 和模板，而不是直接依赖模型记忆回答。
 
-## Local Materials
+## 本地资料
 
-Put user-provided standards material here:
+把用户提供的标准材料放在这里：
 
 ```text
 TDoc/_incoming/
 ```
 
-Then parse and index:
+然后解析并建索引：
 
 ```bash
 python scripts/3gpp_research.py parse
 python scripts/3gpp_research.py build-db
 ```
 
-Generated files are local working artifacts and are ignored by Git:
+生成文件属于本地工作产物，并会被 Git 忽略：
 
 ```text
 TDoc/_processed/
@@ -88,80 +96,85 @@ TDoc/_index/research.db
 research-runs/<generated reports>
 ```
 
-## CLI Commands
+## CLI 命令
 
-| Command | Purpose |
+| 命令 | 用途 |
 | --- | --- |
-| `fetch --url <url>` | Download an official URL into `TDoc/_incoming/` |
-| `fetch-list --file urls.txt` | Download a list of URLs |
-| `fetch-spec --spec 38.331 --latest` | Download a ZIP from the 3GPP Specs archive |
-| `parse` | Parse incoming files into Markdown/text artifacts |
-| `build-db` | Build SQLite FTS and relation tables |
-| `search <query>` | Search the local evidence database |
-| `relations` | Show basic GraphRAG-style relation rows |
-| `check-tools` | Check external tools configured in `tools.json` |
-| `run-tool <name>` | Run an external tool configured in `tools.json` |
-| `verify <file>` | Check a report for ungrounded `confirmed` claims |
-| `research <question>` | Run a generic evidence-first research workflow |
+| `fetch --url <url>` | 将官方 URL 下载到 `TDoc/_incoming/` |
+| `fetch-list --file urls.txt` | 下载 URL 列表中的文件 |
+| `fetch-spec --spec 38.331 --latest` | 从 3GPP Specs archive 下载 ZIP |
+| `parse` | 将 incoming 文件解析为 Markdown/text 产物 |
+| `build-db` | 构建 SQLite FTS 和关系表 |
+| `search <query>` | 检索本地证据数据库 |
+| `relations` | 显示基础 GraphRAG 风格关系行 |
+| `check-tools` | 检查 `tools.json` 中配置的外部工具 |
+| `run-tool <name>` | 运行 `tools.json` 中配置的外部工具 |
+| `verify <file>` | 检查报告中未落地到证据的 `confirmed` 结论 |
+| `research <question>` | 运行通用的证据优先研究工作流 |
 
-## Project Layout
+## 项目结构
 
 ```text
 3gpp-research-kit/
   README.md
   SKILL.md
-  workflows/        # task, evidence, report, checklist, routing templates
-  scripts/          # local CLI and parsers
-  sources/          # official 3GPP / FTP / Forge notes
-  mcp/              # MCP integration notes and examples
-  rag/              # RAG integration notes
-  graphrag/         # graph schema, relation template, KG notes
-  TDoc/             # local source material workspace
-  research-runs/    # report templates and generated runs
-  example/          # sample research report
+  config/           # 任务分类、规范提示、检索扩展、排序和 claim 规则
+  templates/        # 报告模板
+  tools/            # 工具注册表和角色定义
+  workflows/        # 任务、证据、报告、检查清单、工具路由模板
+  scripts/          # 本地 CLI 和解析器
+  sources/          # 3GPP / FTP / Forge 官方来源说明
+  mcp/              # MCP 接入说明和示例
+  rag/              # RAG 接入说明
+  graphrag/         # 图谱 schema、关系模板、知识图谱说明
+  TDoc/             # 本地源材料工作区
+  research-runs/    # 报告模板和生成的研究过程
+  example/          # 示例研究报告
 ```
 
-## Evidence Rules
+## 证据规则
 
-Use these as final grounding sources whenever possible:
+只要条件允许，优先使用以下材料作为最终证据来源：
 
-- Official TS/TR clause or specification archive.
-- CR and reason for change.
-- TDoc-carried meeting material.
-- Meeting Report.
-- Official 3GPP / ETSI / GSMA source.
+- 官方 TS/TR clause 或 specification archive。
+- CR 及其 reason for change。
+- TDoc 承载的会议材料。
+- Meeting Report。
+- 3GPP / ETSI / GSMA 官方来源。
 
-If evidence is incomplete, mark the claim as `needs_verification`. Third-party pages, patents, and model outputs can guide investigation, but they are not final standards evidence.
+如果证据不完整，应将结论标记为 `needs_verification`。第三方网页、专利和模型输出可以用于引导调查，但不能作为最终标准证据。
 
-## Relationship To 3GPP Research Agent
+## 与 3GPP Research Agent 的关系
 
-`3gpp-research-kit` is the reusable workbench and evidence layer.
+`3gpp-research-kit` 是可复用的工作台和证据层。
 
-`3gpp-research-agent` is a separate dedicated CLI agent that can build on this evidence layer while adding stronger planning, model calls, specialized report generation, and run management.
+`3gpp-research-agent` 是一个独立的专用 CLI Agent，可以构建在这个证据层之上，同时增加更强的规划、模型调用、专项报告生成和运行管理能力。
 
-The kit should remain useful on its own: a human or a workspace agent can clone this repository and produce a report without installing the dedicated agent.
+这个 kit 本身应保持可独立使用：人类研究者或工作区 Agent 克隆本仓库后，即使不安装专用 Agent，也能生成研究报告。
 
-## Current Status
+## 当前状态
 
-Executable MVP.
+可执行 MVP。
 
-Implemented:
+已实现：
 
-- Local project workflow and templates.
-- 3GPP research skill instructions.
-- Official source notes and tool-routing rules.
-- CLI for download, parse, index, search, relations, verify, and one-click research.
-- DOCX track-change aware parsing.
-- External tool bridge through `tools.json`.
-- Example report and report templates.
+- 本地项目工作流和模板。
+- 研究状态机、工具编排规则、工具注册表和在线搜索方法。
+- 3GPP research skill 指令。
+- 官方来源说明和工具路由规则。
+- 用于下载、解析、建索引、检索、关系查看、核验和一键研究的 CLI。
+- CLI 从 `config/research-taxonomy.json` 和 `templates/research-report.md` 加载领域规则与报告模板，避免把 3GPP 术语和文档结构硬编码在 Python 中。
+- 感知 DOCX 修订痕迹的解析。
+- 通过 `tools.json` 连接外部工具。
+- 示例报告和报告模板。
 
-Not yet complete:
+尚未完成：
 
-- Full CR / TDoc / Meeting Report portal-scale automation.
-- Clause-aware parser with exact clause pointers for every chunk.
-- Production GraphRAG database integration.
-- Packaged Python API; the current stable interface is the CLI.
+- 面向完整 CR / TDoc / Meeting Report 门户规模的自动化。
+- 能为每个 chunk 提供精确 clause pointer 的 clause-aware parser。
+- 生产级 GraphRAG 数据库集成。
+- 打包后的 Python API；当前稳定接口是 CLI。
 
-## Disclaimer
+## 免责声明
 
-This project helps organize 3GPP standards research. It does not provide official standards conclusions. Always verify important claims against official 3GPP, ETSI, or other authoritative sources.
+本项目用于辅助组织 3GPP 标准研究，不提供官方标准结论。重要结论必须始终回到 3GPP、ETSI 或其他权威来源核验。

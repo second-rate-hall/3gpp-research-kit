@@ -24,6 +24,8 @@
 
 | 文件 | 用途 |
 | --- | --- |
+| `research-system.md` | 定义从研究目标到报告的整体状态机 |
+| `tool-orchestration.md` | 把 MCP、RAG、GraphRAG、parser、online search、verifier 组织成工具角色 |
 | `task-template.md` | 定义研究目标、范围、工具和输出要求 |
 | `evidence-schema.md` | 规定证据表字段，避免只给泛泛结论 |
 | `report-template.md` | 规定最终报告结构 |
@@ -33,13 +35,15 @@
 ## 推荐执行流程
 
 ```text
-1. 读取 task-template.md，生成本次研究任务说明。
-2. 按 checklist.md 做研究计划。
-3. 按 tool-routing.md 选择 MCP、RAG、GraphRAG、官方资料入口或本地脚本。
-4. 检索 TS/TR、CR、TDoc 中的会议材料、Meeting Report 或官方网页。
-5. 按 evidence-schema.md 记录证据。
-6. 按 report-template.md 生成报告。
-7. 用 checklist.md 做最终自检。
+1. 读取 research-system.md，确认本次研究状态机。
+2. 读取 task-template.md，生成本次研究任务说明。
+3. 按 checklist.md 做研究计划。
+4. 按 tool-orchestration.md 和 tool-routing.md 选择 MCP、RAG、GraphRAG、官方资料入口、本地脚本或在线搜索。
+5. 本地资料不足时，按 sources/online-search-playbook.md 和 sources/search-recipes.json 发现官方来源。
+6. 检索 TS/TR、CR、TDoc 中的会议材料、Meeting Report 或官方网页。
+7. 按 evidence-schema.md 记录证据。
+8. 按 templates/research-report.md 或 report-template.md 生成报告。
+9. 用 checklist.md 做最终自检。
 ```
 
 ## 质量原则

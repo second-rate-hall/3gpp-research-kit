@@ -1,0 +1,92 @@
+{
+  "task_types": {
+    "cr_trace": ["cr", "change request", "reason for change", "修改请求", "变更原因", "溯源"],
+    "release_comparison": ["release", "rel-", "rel ", "版本", "对比", "差异", "比较"],
+    "company_position": ["company", "公司", "厂商", "立场", "proposal", "contribution"],
+    "feature_evolution": ["evolution", "演进", "引入", "背景", "feature", "work item", "wi"],
+    "protocol_procedure": ["procedure", "流程", "handover", "re-establishment", "registration", "rrc", "nas"],
+    "ambiguity_or_conflict_check": ["ambiguity", "conflict", "歧义", "冲突", "不一致"],
+    "test_case_draft": ["test case", "测试用例", "tc"]
+  },
+  "spec_hints": [
+    {"spec": "38.331", "keywords": ["38.331", "38331", "nr rrc", "5g rrc", "rrcsetup", "rrcreestablishment", "rrc re-establishment"]},
+    {"spec": "36.331", "keywords": ["36.331", "36331", "lte rrc", "4g rrc", "rrcconnectionreestablishment"]},
+    {"spec": "38.300", "keywords": ["38.300", "38300", "nr overall", "ng-ran", "5g architecture"]},
+    {"spec": "36.300", "keywords": ["36.300", "36300", "e-utran", "lte overall", "4g architecture"]},
+    {"spec": "38.304", "keywords": ["38.304", "38304", "nr cell selection", "cell reselection", "s-search", "小区选择", "小区重选"]},
+    {"spec": "36.304", "keywords": ["36.304", "36304", "e-utra cell selection", "lte cell selection"]},
+    {"spec": "24.501", "keywords": ["24.501", "24501", "5g nas", "registration", "pdu session", "amf", "5gc"]},
+    {"spec": "24.301", "keywords": ["24.301", "24301", "eps nas", "attach", "tau", "mme", "4g nas"]},
+    {"spec": "38.413", "keywords": ["38.413", "38413", "ngap", "n2", "amf"]},
+    {"spec": "36.413", "keywords": ["36.413", "36413", "s1ap", "mme"]},
+    {"spec": "23.501", "keywords": ["23.501", "23501", "system architecture", "5gs", "5gc", "slicing", "qos"]},
+    {"spec": "23.502", "keywords": ["23.502", "23502", "5gs procedure", "service based", "registration procedure"]}
+  ],
+  "spec_cooccurrence_rules": [
+    {"spec": "36.331", "all": ["rrc"], "any": ["4g", "lte"]},
+    {"spec": "38.331", "all": ["rrc"], "any": ["5g", "nr"]}
+  ],
+  "query_expansion_rules": [
+    {"any": ["rrcsetup", "rrc setup"], "queries": ["RRCSetup", "RRCSetup fallback", "RRC establishment"]},
+    {"any": ["re-establishment", "reestablishment", "重建"], "queries": ["RRC re-establishment", "RRC connection re-establishment", "RRCReestablishmentRequest RRCReestablishment RRCReestablishmentComplete", "RRCConnectionReestablishmentRequest RRCConnectionReestablishment RRCConnectionReestablishmentComplete", "fallback RRCSetup", "valid UE context", "AS security activated"]},
+    {"any": ["cell selection", "小区选择"], "queries": ["cell selection", "cell reselection", "suitable cell", "acceptable cell"]},
+    {"any": ["registration", "注册"], "queries": ["registration procedure", "Registration Request", "Registration Accept"]}
+  ],
+  "task_query_expansions": {
+    "cr_trace": ["reason for change", "change request", "affected clauses"],
+    "release_comparison": ["release", "introduced", "modified", "change"]
+  },
+  "default_tool_roles": ["source_discovery", "acquisition", "parsing", "indexing", "evidence_retrieval", "verification", "reporting"],
+  "task_tool_roles": {
+    "cr_trace": ["spec_discovery", "source_discovery", "evidence_retrieval", "relation_reasoning", "verification"],
+    "release_comparison": ["source_discovery", "evidence_retrieval", "relation_reasoning", "evolution_trace", "verification"],
+    "company_position": ["source_discovery", "evidence_retrieval", "relation_reasoning", "company_position_trace", "verification"],
+    "feature_evolution": ["source_discovery", "evidence_retrieval", "relation_reasoning", "evolution_trace", "auxiliary_background", "pain_point_inference", "verification"],
+    "protocol_procedure": ["terminology", "evidence_retrieval", "relation_reasoning", "verification"],
+    "ambiguity_or_conflict_check": ["terminology", "evidence_retrieval", "relation_reasoning", "verification"],
+    "test_case_draft": ["terminology", "evidence_retrieval", "verification", "reporting"],
+    "clause_explanation": ["terminology", "evidence_retrieval", "verification"],
+    "general_research": ["source_discovery", "terminology", "evidence_retrieval", "relation_reasoning", "verification"]
+  },
+  "document_type_map": {
+    "spec": "TS",
+    "cr": "CR",
+    "tdoc": "TDoc",
+    "meeting_report": "Meeting Report"
+  },
+  "official_source_types": ["TS", "TR", "CR", "TDoc", "Meeting Report"],
+  "rank_terms": [
+    {"term": "procedure", "score": 15},
+    {"term": "purpose", "score": 12},
+    {"term": "shall", "score": 10},
+    {"term": "rrcsetup", "score": 18},
+    {"term": "re-establishment", "score": 18},
+    {"term": "valid ue context", "score": 20},
+    {"term": "reason for change", "score": 22},
+    {"term": "change request", "score": 18},
+    {"term": "meeting report", "score": 18},
+    {"term": "approved", "score": 12},
+    {"term": "agreed", "score": 12}
+  ],
+  "rank_boosts": {
+    "official_url": 20,
+    "spec_id": 8,
+    "tdoc_or_cr": 10
+  },
+  "claim_rules": [
+    {"contains_all": ["fallback", "rrc establishment", "successful"], "claim": "{source} 中出现 RRC re-establishment fallback to RRC establishment 的成功路径线索。"},
+    {"contains_all": ["not able to retrieve or verify", "rrcsetup"], "claim": "{source} 中出现网络无法 retrieve/verify UE context 时由 RRCSetup 承接的证据线索。"},
+    {"contains_all": ["valid ue context", "connection re-establishment succeeds"], "claim": "{source} 中出现 connection re-establishment 成功依赖 valid UE context 的证据线索。"},
+    {"contains_any": ["rrcsetup ::=", "network to ue rrcsetup"], "claim": "{source} 中包含 RRCSetup 消息定义，可用于核验 fallback 分支中的消息语义。"},
+    {"contains_any": ["rrcreestablishmentrequest", "rrcconnectionreestablishmentrequest"], "claim": "{source} 中包含 RRC re-establishment 请求/响应消息相关证据。"},
+    {"contains_all": ["reason for change"], "claim": "{source} 中出现 CR reason for change 线索，可用于追踪修改动机。"}
+  ],
+  "fallback_claim": "{source} 中存在与检索问题 `{query}` 相关的证据片段。",
+  "comparison_axes": ["资料覆盖", "过程/消息证据", "版本或系统差异", "待核验项"],
+  "verification_open_items": [
+    {"item": "clause 级定位", "reason": "当前自动报告使用 chunk_index，未保证抽取到完整 clause 边界", "next_step": "回到 processed 文本或官方 DOCX，补充 clause 编号和原文上下文"},
+    {"item": "CR / TDoc / Meeting Report 溯源", "reason": "本地检索未必覆盖相关会议资料", "next_step": "查询 3GPP Portal、FTP Docs 目录和 Meeting Report"},
+    {"item": "Release 差异", "reason": "未自动完成版本间 diff", "next_step": "下载目标版本 archive，进行 clause diff 和 CR trace"},
+    {"item": "工程影响", "reason": "标准文本不能直接代表具体实现行为", "next_step": "结合实现文档、日志、测试规范和专家复核"}
+  ]
+}

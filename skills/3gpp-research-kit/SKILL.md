@@ -86,7 +86,7 @@ Use available tools in this order:
 When the user wants `3gpp-research-kit` itself to generate a report, prefer the upper-level command before manually chaining low-level tools:
 
 ```bash
-python scripts/3gpp_research.py research "<研究问题>" --spec 38.331 --latest
+python scripts/3gpp_research.py research "<research question>" --spec <spec-id> --latest
 ```
 
 This command should remain generic, evidence-first, and explainable. It may classify the task, infer or accept candidate specs, fetch/reuse official materials, parse/build the local index, retrieve evidence, write a report under `research-runs/`, and run evidence verification.
